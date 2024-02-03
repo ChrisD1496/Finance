@@ -113,3 +113,28 @@ print(allocation_bl)
 print(f"Remaining Unallocated Funds: ${leftover_bl:.2f}")
 ```
 Explore and customize the provided functions based on your portfolio construction needs. The class allows for easy extension to incorporate additional optimization techniques in future chapters.
+
+## Citation
+
+
+```bibtex
+@misc{riskfolio,
+    author = {Dany Cajas},
+    title = {Riskfolio-Lib (5.0.0)},
+    year = {2024},
+    url = {https://github.com/dcajasn/Riskfolio-Lib},
+}
+
+@article{Martin2021,
+  doi = {10.21105/joss.03066},
+  url = {https://doi.org/10.21105/joss.03066},
+  year = {2021},
+  publisher = {The Open Journal},
+  volume = {6},
+  number = {61},
+  pages = {3066},
+  author = {Robert Andrew Martin},
+  title = {PyPortfolioOpt: portfolio optimization in Python},
+  journal = {Journal of Open Source Software}
+}
+```
