@@ -141,46 +141,165 @@ Explore and implement simple yet effective trading strategies using Python. This
 
 ### Moving Average Strategy
 
-#### Implementation
+#### Class Overview
 
-The Moving Average strategy employs two simple moving averages (SMA) with different window sizes. It generates buy signals when the short-term SMA crosses above the long-term SMA and sell signals when the opposite occurs.
+##### Initialization
+
+- **tickers:** List of stock tickers for analysis.
+- **start_date:** Start date for data retrieval in 'YYYY-MM-DD' format.
+- **end_date:** End date for data retrieval in 'YYYY-MM-DD' format.
+
+##### Functions
+
+1. **Load Tickers Data:**
+   - Description: Loads time series financial data for multiple tickers.
+   - Usage:
+     ```python
+     data_map = trading.load_tickers_data()
+     ```
+
+2. **Calculate Profit:**
+   - Description: Calculates cumulative profit based on trading signals and stock prices.
+   - Usage:
+     ```python
+     cumulative_profit = trading.calculate_profit(signals, prices)
+     ```
+
+3. **Plot Strategy:**
+   - Description: Plots a trading strategy with buy and sell signals and cumulative profit.
+   - Usage:
+     ```python
+     ax1, ax2 = trading.plot_strategy(prices_df, signal_df, profit)
+     ```
 
 #### Optimization Process
 
-Optimize the strategy by testing various combinations of short and long window sizes. Select optimal parameters based on cumulative profit over historical stock data, considering transaction costs.
+Optimize the strategy by testing various combinations of parameters, such as transaction costs and window sizes. Select optimal parameters based on cumulative returns over historical stock data.
 
 ### Momentum Strategy
 
-#### Implementation
+#### Class Overview
 
-The Naive Momentum strategy identifies consecutive positive or negative price changes to generate buy or sell signals. Adjust the number of consecutive days required to trigger a signal based on your preference.
+##### Initialization
+
+- **tickers:** List of stock tickers for analysis.
+- **start_date:** Start date for data retrieval in 'YYYY-MM-DD' format.
+- **end_date:** End date for data retrieval in 'YYYY-MM-DD' format.
+- **nb_conseq_days_range:** Range of values for the number of consecutive days.
+
+##### Functions
+
+1. **Load Tickers Data:**
+   - Description: Loads time series financial data for multiple tickers.
+   - Usage:
+     ```python
+     data_map = trading.load_tickers_data()
+     ```
+
+2. **Optimize Naive Momentum:**
+   - Description: Optimizes the hyperparameter nb_conseq_days for the naive momentum strategy.
+   - Usage:
+     ```python
+     optimal_nb_conseq_days = trading.optimize_naive_momentum(ticker_ts_df, nb_conseq_days_range)
+     ```
+
+3. **Naive Momentum Signals:**
+   - Description: Generates naive momentum trading signals based on consecutive positive or negative price changes.
+   - Usage:
+     ```python
+     signals_momentum = trading.naive_momentum_signals(ticker_ts_df, nb_conseq_days=optimal_nb_conseq_days)
+     ```
 
 #### Optimization Process
 
-Optimize the strategy by determining the optimal number of consecutive days. Maximize cumulative profit over the specified date range.
+Optimize the strategy by determining the optimal number of consecutive days. Maximize cumulative returns over the specified date range.
 
 ### Mean Reversion Strategy
 
-#### Implementation
+#### Class Overview
 
-The Mean Reversion strategy utilizes moving averages and threshold values. It generates buy signals when the stock price is significantly below the moving average and sell signals when above a certain threshold.
+##### Initialization
+
+- **tickers:** List of stock tickers for analysis.
+- **start_date:** Start date for data retrieval in 'YYYY-MM-DD' format.
+- **end_date:** End date for data retrieval in 'YYYY-MM-DD' format.
+- **entry_threshold_range:** Range of values for the entry threshold.
+- **exit_threshold_range:** Range of values for the exit threshold.
+
+##### Functions
+
+1. **Load Tickers Data:**
+   - Description: Loads time series financial data for multiple tickers.
+   - Usage:
+     ```python
+     data_map = trading.load_tickers_data()
+     ```
+
+2. **Optimize Mean Reversion:**
+   - Description: Optimizes the hyperparameters entry_threshold and exit_threshold for the mean reversion strategy.
+   - Usage:
+     ```python
+     optimal_entry_threshold, optimal_exit_threshold = trading.optimize_mean_reversion(ticker_ts_df, entry_threshold_range, exit_threshold_range)
+     ```
+
+3. **Mean Reversion Signals:**
+   - Description: Generates mean reversion trading signals based on moving averages and thresholds.
+   - Usage:
+     ```python
+     signals_mean_reversion = trading.mean_reversion(ticker_ts_df, entry_threshold=optimal_entry_threshold, exit_threshold=optimal_exit_threshold)
+     ```
 
 #### Optimization Process
 
-Optimize the strategy by experimenting with different entry and exit threshold values. Select parameters that maximize cumulative profit, considering transaction costs.
+Optimize the strategy by experimenting with different entry and exit threshold values. Select parameters that maximize cumulative returns, considering transaction costs.
 
 ### Pairs Trading Strategy
 
-#### Implementation
+#### Class Overview
 
-Pairs Trading involves identifying cointegrated pairs of stocks and trading based on the z-score analysis of the ratio between their prices.
+##### Initialization
+
+- **tickers:** List of stock tickers for analysis.
+- **start_date:** Start date for data retrieval in 'YYYY-MM-DD' format.
+- **end_date:** End date for data retrieval in 'YYYY-MM-DD' format.
+- **p_value_threshold:** The significance level for cointegration testing.
+
+##### Functions
+
+1. **Load Tickers Data:**
+   - Description: Loads time series financial data for multiple tickers.
+   - Usage:
+     ```python
+     data_map = trading.load_tickers_data()
+     ```
+
+2. **Find Cointegrated Pairs:**
+   - Description: Finds cointegrated pairs of stocks based on the Augmented Dickey-Fuller test.
+   - Usage:
+     ```python
+     cointegrated_pairs = trading.find_cointegrated_pairs(ticker_ts_df, p_value_threshold)
+     ```
+
+3. **Optimize Pairs Trading:**
+   - Description: Optimizes the pair for the pairs trading strategy based on cumulative returns.
+   - Usage:
+     ```python
+     optimal_pair = trading.optimize_pairs_trading(ticker_ts_df, cointegrated_pairs)
+     ```
+
+4. **Pairs Trading Z-Score:**
+   - Description: Generates pairs trading signals based on z-score analysis of the price ratio.
+   - Usage:
+     ```python
+     signals_pairs_trading = trading.pairs_trading_z_score(ticker_ts_df, pair=optimal_pair)
+     ```
 
 #### Optimization Process
 
-Optimize the strategy by finding cointegrated pairs with low p-values. Select the optimal pair based on cumulative profit, considering transaction costs.
+Optimize the strategy by finding cointegrated pairs with low p-values. Select the optimal pair based on cumulative returns, considering transaction costs.
 
 ### Conclusion and Citation
 
-This chapter introduces and optimizes four simple trading strategies. The code is structured in an object-oriented manner, allowing for easy customization and extension. The strategies are optimized for specific parameters to maximize cumulative profit over historical data. Feel free to explore, modify, and integrate these strategies into your trading projects.
+This chapter introduces and optimizes four simple trading strategies. The code is structured in an object-oriented manner, allowing for easy customization and extension. The strategies are optimized for specific parameters to maximize cumulative returns over historical data. Feel free to explore, modify, and integrate these strategies into your trading projects.
 
 For the original code and further details, refer to the GitHub repository of Adam Darmanin: [https://github.com/adamd1985/quant_research](https://github.com/adamd1985/quant_research).
