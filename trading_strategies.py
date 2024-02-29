@@ -64,19 +64,19 @@ class Trading:
         data_map = {ticker: self._load_ticker_ts_df(ticker) for ticker in self.tickers}
         return data_map
 
-    def calculate_profit(self, signals, prices, transaction_cost=50):
+    def calculate_profit(self, signals, prices, transaction_cost=5):
         """
         Calculate cumulative profit based on trading signals and stock prices.
 
         Parameters:
         - signals (pandas.DataFrame): A DataFrame containing trading signals (1 for buy, -1 for sell).
         - prices (pandas.Series): A Series containing stock prices corresponding to the signal dates.
-        - transaction_cost (float): Transaction cost as a bp amount.
+        - transaction_cost (float): Transaction cost as absolute values per order.
 
         Returns:
         - cum_profit (pandas.Series): A Series containing cumulative profit over time.
         """
-        transaction_cost = transaction_cost / 100 / 100
+        transaction_cost = transaction_cost
         profit = pd.Series(index=prices.index).fillna(0)
 
         buys = signals[signals['orders'] == 1].index
@@ -91,15 +91,15 @@ class Trading:
 
             if len(sis) > 0:
                 si = sis[0]
-                profit[si] = (prices[si] - prices[bi]) * (1 - transaction_cost)
+                profit[si] = (prices[si] - prices[bi]) * - (2*transaction_cost)
                 skip = len(buys[(buys > bi) & (buys < si)])
             else:
-                profit[-1] = (prices[-1] - prices[bi]) * (1 - transaction_cost)
+                profit[-1] = (prices[-1] - prices[bi]) - (2 * transaction_cost)
 
         cum_profit = profit.cumsum()
         return cum_profit
 
-    def plot_strategy(self, prices_df, signal_df, profit):
+    def plot_strategy(self, prices_df, signal_df, profit,title='Trading Strategy'):
         """
         Plot a trading strategy with buy and sell signals and cumulative profit.
 
@@ -107,6 +107,7 @@ class Trading:
         - prices_df (pandas.Series): A Series containing stock prices.
         - signal_df (pandas.DataFrame): A DataFrame with buy (1) and sell (-1) signals.
         - profit (pandas.Series): A Series containing cumulative profit over time.
+        - title (str): The title for the entire figure. Default is 'Trading Strategy'.
 
         Returns:
         - ax1 (matplotlib.axes.Axes): The top subplot displaying stock prices and signals.
@@ -128,6 +129,7 @@ class Trading:
         ax2.plot(profit.index, profit, color='b')
         ax2.set_ylabel('Cumulative Profit (%)')
         ax2.set_xlabel('Date')
+        fig.suptitle(title)
 
         return ax1, ax2
 
@@ -219,7 +221,7 @@ class Trading:
                     continue  # Skip invalid combinations
 
                 signal_sma = T.simple_moving_average(ticker_ts_df, short_window=short_window, long_window=long_window)
-                profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=10)
+                profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
                 cumulative_profit = profit_series_sma.iloc[-1]
 
                 if cumulative_profit > best_profit:
@@ -268,7 +270,7 @@ class Trading:
 
         for nb_days in nb_conseq_days_range:
             signal_momentum = T.naive_momentum_signals(ticker_ts_df, nb_conseq_days=nb_days)
-            profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=10)
+            profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
             cumulative_profit = profit_series_momentum.iloc[-1]
 
             if cumulative_profit > best_profit:
@@ -335,7 +337,7 @@ class Trading:
                 signal_mean_reversion = T.mean_reversion(ticker_ts_df, entry_threshold=entry_threshold,
                                                          exit_threshold=exit_threshold)
                 profit_series_mean_reversion = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"],
-                                                                  transaction_cost=10)
+                                                                  transaction_cost=1)
                 cumulative_profit = profit_series_mean_reversion.iloc[-1]
 
                 if cumulative_profit > best_profit:
@@ -497,9 +499,9 @@ if __name__ == '__main__':
     optimal_short_window, optimal_long_window = T.optimize_simple_moving_average(ticker_ts_df, short_window_range, long_window_range)
     print(f'Optimal short_window: {optimal_short_window}, Optimal long_window: {optimal_long_window}')
     signal_sma = T.simple_moving_average(ticker_ts_df, short_window=optimal_short_window, long_window=optimal_long_window)
-    profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=10)
+    profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
 
-    ax1, ax2 = T.plot_strategy(ticker_ts_df["Adj Close"], signal_sma, profit_series_sma)
+    ax1, ax2 = T.plot_strategy(ticker_ts_df["Adj Close"], signal_sma, profit_series_sma, title='Simple Moving Average Strategy')
     ax1.plot(signal_sma.index, signal_sma['short_mavg'], linestyle='--', label='Fast SMA')
     ax1.plot(signal_sma.index, signal_sma['long_mavg'], linestyle='--', label='Slow SMA')
     ax1.legend(loc='upper left', fontsize=10)
@@ -511,9 +513,9 @@ if __name__ == '__main__':
     print(f'Optimal nb_conseq_days: {optimal_nb_conseq_days}')
 
     signal_momentum = T.naive_momentum_signals(ticker_ts_df,nb_conseq_days=optimal_nb_conseq_days)
-    profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=10)
+    profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
 
-    ax1, ax2 = T.plot_strategy(ticker_ts_df["Adj Close"], signal_momentum, profit_series_momentum)
+    ax1, ax2 = T.plot_strategy(ticker_ts_df["Adj Close"], signal_momentum, profit_series_momentum, title='Momentum Strategy')
     plt.show()
 
     # Using mean reversion
@@ -522,9 +524,9 @@ if __name__ == '__main__':
     print(f'Optimal entry_threshold: {optimal_entry_threshold}, Optimal exit_threshold: {optimal_exit_threshold}')
 
     signal_mean_reversion = T.mean_reversion(ticker_ts_df, entry_threshold=optimal_entry_threshold, exit_threshold=optimal_exit_threshold)
-    profit_series_mean_reversion = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"], transaction_cost=10)
+    profit_series_mean_reversion = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"], transaction_cost=1)
 
-    ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_mean_reversion, profit_series_mean_reversion)
+    ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_mean_reversion, profit_series_mean_reversion, title='Mean Reversion Strategy')
     ax1.plot(signal_mean_reversion.index, signal_mean_reversion['mean'], linestyle='--', label="Mean")
     ax1.plot(signal_mean_reversion.index, signal_mean_reversion['mean'] +
              signal_mean_reversion['std'], linestyle='--', label="Ceiling STD")
@@ -553,9 +555,9 @@ if __name__ == '__main__':
         # Plot individual strategies for the optimal pair
         plt.figure(figsize=(26, 18))
         ax1, _ = T.plot_strategy(clean_df[ticker_1]["Adj Close"], signal_pairs_trading_ticker_1,
-                                 profit_pairs_trading_ticker_1)
+                                 profit_pairs_trading_ticker_1, title='Pairs Trading Stock 1')
         ax2, _ = T.plot_strategy(clean_df[ticker_2]["Adj Close"], signal_pairs_trading_ticker_2,
-                                 profit_pairs_trading_ticker_2)
+                                 profit_pairs_trading_ticker_2, title='Pairs Trading Stock 2')
         ax1.legend(loc='upper left', fontsize=10)
         ax1.set_title(f'{ticker_2} Paired with {ticker_1}', fontsize=18)
         ax2.legend(loc='upper left', fontsize=10)
