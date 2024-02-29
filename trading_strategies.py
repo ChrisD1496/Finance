@@ -134,19 +134,17 @@ class Trading:
         return ax1, ax2
 
     def sanitize_data(self,data_map):
-        TS_DAYS_LENGTH = (pd.to_datetime(self.end_date) -
-                          pd.to_datetime(self.start_date)).days
         data_sanitized = {}
 
         date_range = pd.date_range(start=self.start_date, end=self.end_date, freq='D')
         for ticker, data in data_map.items():
-            if data is None or len(data) < (TS_DAYS_LENGTH / 2):
+            if data is None or len(data) < (self.TS_DAYS_LENGTH / 2):
                 # We cannot handle shorter TSs
                 continue
 
-            if len(data) > TS_DAYS_LENGTH:
-                # Normalize to have the same length (TS_DAYS_LENGTH)
-                data = data[-TS_DAYS_LENGTH:]
+            if len(data) > self.TS_DAYS_LENGTH:
+                # Normalize to have the same length (self.TS_DAYS_LENGTH)
+                data = data[-self.TS_DAYS_LENGTH:]
 
             # Reindex the time series to match the date range and fill in any blanks (Not Numbers)
             data = data.reindex(date_range)
@@ -394,7 +392,7 @@ class Trading:
         _, pairs = self.find_cointegrated_pairs(tickers_ts_map, p_value_threshold=p_value_threshold)
 
         # Select the three pairs with the lowest p-values
-        selected_pairs = sorted(pairs, key=lambda x: x[2])[:3]
+        selected_pairs = sorted(pairs, key=lambda x: x[2])[:5]
 
         best_profit = 0
         optimal_pair = None
