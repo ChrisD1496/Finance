@@ -276,6 +276,7 @@ class Trading:
                 optimal_nb_conseq_days = nb_days
 
         return optimal_nb_conseq_days
+
     def naive_momentum_signals(self, ticker_ts_df, nb_conseq_days=2):
         """
         Generate naive momentum trading signals based on consecutive positive or negative price changes.
@@ -294,16 +295,25 @@ class Trading:
 
         signal = 0
         cons_day = 0
+        reset_flag=0
+        first_signal_positiv = False
 
         for i in range(1, len(ticker_ts_df)):
             if price_diff[i] > 0:
+                if reset_flag==-1:
+                    cons_day=-1
+                reset_flag=1
                 cons_day = cons_day + 1 if price_diff[i] > 0 else 0
                 if cons_day == nb_conseq_days and signal != 1:
                     signals['orders'].iloc[i] = 1
                     signal = 1
+                    first_signal_positiv=True
             elif price_diff[i] < 0:
+                if reset_flag==1:
+                    cons_day=1
+                reset_flag = -1
                 cons_day = cons_day - 1 if price_diff[i] < 0 else 0
-                if cons_day == -nb_conseq_days and signal != -1:
+                if cons_day == -nb_conseq_days and signal != -1 and first_signal_positiv:
                     signals['orders'].iloc[i] = -1
                     signal = -1
 
@@ -329,8 +339,7 @@ class Trading:
         # Try different combinations of entry_threshold and exit_threshold
         for entry_threshold in entry_threshold_range:
             for exit_threshold in exit_threshold_range:
-                if entry_threshold <= exit_threshold:
-                    continue  # Skip invalid combinations
+
 
                 signal_mean_reversion = T.mean_reversion(ticker_ts_df, entry_threshold=entry_threshold,
                                                          exit_threshold=exit_threshold)
@@ -469,7 +478,7 @@ if __name__ == '__main__':
     short_window_range = range(1, 20)
     long_window_range = range(2, 100)
 
-    nb_conseq_days_range = range(1, 100)
+    nb_conseq_days_range = range(1, 30)
 
     entry_threshold_range = np.arange(0.0, 3.0, 0.1)  # Example range, adjust as needed
     exit_threshold_range = np.arange(0.0, 3, 0.1)  # Example range, adjust as needed
@@ -499,7 +508,7 @@ if __name__ == '__main__':
     signal_sma = T.simple_moving_average(ticker_ts_df, short_window=optimal_short_window, long_window=optimal_long_window)
     profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
 
-    ax1, ax2 = T.plot_strategy(ticker_ts_df["Adj Close"], signal_sma, profit_series_sma, title='Simple Moving Average Strategy')
+    ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_sma, profit_series_sma, title='Simple Moving Average Strategy')
     ax1.plot(signal_sma.index, signal_sma['short_mavg'], linestyle='--', label='Fast SMA')
     ax1.plot(signal_sma.index, signal_sma['long_mavg'], linestyle='--', label='Slow SMA')
     ax1.legend(loc='upper left', fontsize=10)
@@ -513,7 +522,7 @@ if __name__ == '__main__':
     signal_momentum = T.naive_momentum_signals(ticker_ts_df,nb_conseq_days=optimal_nb_conseq_days)
     profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
 
-    ax1, ax2 = T.plot_strategy(ticker_ts_df["Adj Close"], signal_momentum, profit_series_momentum, title='Momentum Strategy')
+    ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_momentum, profit_series_momentum, title='Momentum Strategy')
     plt.show()
 
     # Using mean reversion
