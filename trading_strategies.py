@@ -64,20 +64,24 @@ class Trading:
         data_map = {ticker: self._load_ticker_ts_df(ticker) for ticker in self.tickers}
         return data_map
 
-    def calculate_profit(self, signals, prices, transaction_cost=5):
+    def calculate_profit(self, signals, prices, transaction_cost=0, risk_free_rate=3):
         """
-        Calculate cumulative profit based on trading signals and stock prices.
+        Calculate cumulative profit and daily returns based on trading signals and stock prices.
 
         Parameters:
         - signals (pandas.DataFrame): A DataFrame containing trading signals (1 for buy, -1 for sell).
         - prices (pandas.Series): A Series containing stock prices corresponding to the signal dates.
         - transaction_cost (float): Transaction cost as absolute values per order.
+        - risk_free_rate (float): Risk Free Rate as %.
 
         Returns:
-        - cum_profit (pandas.Series): A Series containing cumulative profit over time.
+        - daily_returns (pandas.DataFrame): A DataFrame containing daily returns when invested.
+        - Sharpe Ratio (float): Contains the Sharpe Ratio of the trading strategy.
+        - Max Drawdown Length (int): Contains the Max Drawdown Length of the trading strategy.
         """
         transaction_cost = transaction_cost
         profit = pd.Series(index=prices.index).fillna(0)
+        daily_returns = pd.Series(index=prices.index).fillna(0)
 
         buys = signals[signals['orders'] == 1].index
         sells = signals[signals['orders'] == -1].index
@@ -91,13 +95,31 @@ class Trading:
 
             if len(sis) > 0:
                 si = sis[0]
-                profit[si] = (prices[si] - prices[bi]) * - (2*transaction_cost)
+
+                daily_return = prices[bi:si].pct_change()
+                daily_return.iloc[0] = daily_return.iloc[0] - (transaction_cost / prices[bi])
+                daily_return.iloc[-1] = daily_return.iloc[-1] - (transaction_cost / prices[si])
+                daily_returns.loc[bi:si] = daily_returns.loc[bi:si].add(daily_return.fillna(0), fill_value=0)
                 skip = len(buys[(buys > bi) & (buys < si)])
             else:
-                profit[-1] = (prices[-1] - prices[bi]) - (2 * transaction_cost)
 
-        cum_profit = profit.cumsum()
-        return cum_profit
+                daily_return = prices[bi:].pct_change()
+                daily_return.iloc[0] = daily_return.iloc[0] - (transaction_cost / prices[bi])
+                daily_returns.loc[bi:] = daily_returns.loc[bi:].add(daily_return.fillna(0), fill_value=0)
+
+        cum_daily_profit = ((1 + daily_returns).cumprod() - 1) * 100
+
+        # Calculate Sharpe ratio
+        risk_free_rate = risk_free_rate / 100 / 252
+        invested_days = daily_returns[daily_returns != 0]  # Exclude days with no investment
+        sharpe_ratio = ((invested_days.mean() - risk_free_rate) / invested_days.std()) * np.sqrt(252)
+
+        # Calculate max drawdown
+        negative_days = cum_daily_profit[cum_daily_profit < 0].index
+        drawdown_lengths = [(group[0], len(group)) for group in pd.Series(negative_days).diff().groupby(negative_days).groups.items()]
+        max_drawdown_length = max([length for start_date, length in drawdown_lengths], default=0)
+
+        return cum_daily_profit, sharpe_ratio, max_drawdown_length
 
     def plot_strategy(self, prices_df, signal_df, profit,title='Trading Strategy'):
         """
@@ -219,7 +241,7 @@ class Trading:
                     continue  # Skip invalid combinations
 
                 signal_sma = T.simple_moving_average(ticker_ts_df, short_window=short_window, long_window=long_window)
-                profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
+                profit_series_sma, sharpe_ratio, max_drawdown_length = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
                 cumulative_profit = profit_series_sma.iloc[-1]
 
                 if cumulative_profit > best_profit:
@@ -268,7 +290,7 @@ class Trading:
 
         for nb_days in nb_conseq_days_range:
             signal_momentum = T.naive_momentum_signals(ticker_ts_df, nb_conseq_days=nb_days)
-            profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
+            profit_series_momentum, sharpe_ratio, max_drawdown_length = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
             cumulative_profit = profit_series_momentum.iloc[-1]
 
             if cumulative_profit > best_profit:
@@ -341,10 +363,8 @@ class Trading:
             for exit_threshold in exit_threshold_range:
 
 
-                signal_mean_reversion = T.mean_reversion(ticker_ts_df, entry_threshold=entry_threshold,
-                                                         exit_threshold=exit_threshold)
-                profit_series_mean_reversion = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"],
-                                                                  transaction_cost=1)
+                signal_mean_reversion = T.mean_reversion(ticker_ts_df, entry_threshold=entry_threshold,exit_threshold=exit_threshold)
+                profit_series_mean_reversion, sharpe_ratio, max_drawdown_length = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"], transaction_cost=1)
                 cumulative_profit = profit_series_mean_reversion.iloc[-1]
 
                 if cumulative_profit > best_profit:
@@ -409,10 +429,10 @@ class Trading:
         for pair in selected_pairs:
             ticker_1, ticker_2, _ = pair
             signal_pair_1 = self.pairs_trading_z_score(tickers_ts_map, ticker_1, ticker_2)
-            profit_pair_1 = self.calculate_profit(signal_pair_1, tickers_ts_map[ticker_1]["Adj Close"])
+            profit_pair_1, sharpe_ratio, max_drawdown_length = self.calculate_profit(signal_pair_1, tickers_ts_map[ticker_1]["Adj Close"])
 
             signal_pair_2 = self.pairs_trading_z_score(tickers_ts_map, ticker_1, ticker_2, first_ticker=False)
-            profit_pair_2 = self.calculate_profit(signal_pair_2, tickers_ts_map[ticker_2]["Adj Close"])
+            profit_pair_2, sharpe_ratio, max_drawdown_length = self.calculate_profit(signal_pair_2, tickers_ts_map[ticker_2]["Adj Close"])
 
             cumulative_profit_pair = profit_pair_1 + profit_pair_2
 
@@ -506,7 +526,8 @@ if __name__ == '__main__':
     optimal_short_window, optimal_long_window = T.optimize_simple_moving_average(ticker_ts_df, short_window_range, long_window_range)
     print(f'Optimal short_window: {optimal_short_window}, Optimal long_window: {optimal_long_window}')
     signal_sma = T.simple_moving_average(ticker_ts_df, short_window=optimal_short_window, long_window=optimal_long_window)
-    profit_series_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
+    profit_series_sma, sharpe_ratio_sma, max_drawdown_length_sma = T.calculate_profit(signal_sma, ticker_ts_df["Adj Close"], transaction_cost=1)
+    print(f'Sharpe Ratio Simple Moving Average Strategy: {sharpe_ratio_sma}, Maximal Drawdown Length Simple Moving Average Strategy: {max_drawdown_length_sma}')
 
     ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_sma, profit_series_sma, title='Simple Moving Average Strategy')
     ax1.plot(signal_sma.index, signal_sma['short_mavg'], linestyle='--', label='Fast SMA')
@@ -520,7 +541,8 @@ if __name__ == '__main__':
     print(f'Optimal nb_conseq_days: {optimal_nb_conseq_days}')
 
     signal_momentum = T.naive_momentum_signals(ticker_ts_df,nb_conseq_days=optimal_nb_conseq_days)
-    profit_series_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
+    profit_series_momentum, sharpe_ratio_momentum, max_drawdown_length_momentum = T.calculate_profit(signal_momentum, ticker_ts_df["Adj Close"], transaction_cost=1)
+    print(f'Sharpe Ratio Momentum Strategy: {sharpe_ratio_momentum}, Maximal Drawdown Length Momentum Strategy: {max_drawdown_length_momentum}')
 
     ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_momentum, profit_series_momentum, title='Momentum Strategy')
     plt.show()
@@ -531,7 +553,8 @@ if __name__ == '__main__':
     print(f'Optimal entry_threshold: {optimal_entry_threshold}, Optimal exit_threshold: {optimal_exit_threshold}')
 
     signal_mean_reversion = T.mean_reversion(ticker_ts_df, entry_threshold=optimal_entry_threshold, exit_threshold=optimal_exit_threshold)
-    profit_series_mean_reversion = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"], transaction_cost=1)
+    profit_series_mean_reversion, sharpe_ratio_mean_reversion, max_drawdown_length_mean_reversion = T.calculate_profit(signal_mean_reversion, ticker_ts_df["Adj Close"], transaction_cost=1)
+    print(f'Sharpe Ratio Mean Reversion Strategy: {sharpe_ratio_mean_reversion}, Maximal Drawdown Length Mean Reversion Strategy: {max_drawdown_length_mean_reversion}')
 
     ax1, _ = T.plot_strategy(ticker_ts_df["Adj Close"], signal_mean_reversion, profit_series_mean_reversion, title='Mean Reversion Strategy')
     ax1.plot(signal_mean_reversion.index, signal_mean_reversion['mean'], linestyle='--', label="Mean")
@@ -554,9 +577,9 @@ if __name__ == '__main__':
         signal_pairs_trading_ticker_1 = T.pairs_trading_z_score(clean_df, ticker_1, ticker_2)
         signal_pairs_trading_ticker_2 = T.pairs_trading_z_score(clean_df, ticker_1, ticker_2, first_ticker=False)
 
-        profit_pairs_trading_ticker_1 = T.calculate_profit(signal_pairs_trading_ticker_1,
+        profit_pairs_trading_ticker_1, sharpe_ratio, max_drawdown_length = T.calculate_profit(signal_pairs_trading_ticker_1,
                                                            clean_df[ticker_1]["Adj Close"])
-        profit_pairs_trading_ticker_2 = T.calculate_profit(signal_pairs_trading_ticker_2,
+        profit_pairs_trading_ticker_2, sharpe_ratio, max_drawdown_length = T.calculate_profit(signal_pairs_trading_ticker_2,
                                                            clean_df[ticker_2]["Adj Close"])
 
         # Plot individual strategies for the optimal pair
