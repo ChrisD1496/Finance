@@ -9,6 +9,8 @@ import yfinance as yf
 from statsmodels.tsa.stattools import coint
 from itertools import combinations
 import seaborn as sns
+from statsmodels.tsa.stattools import adfuller
+
 
 warnings.filterwarnings("ignore")
 
@@ -357,6 +359,12 @@ class Trading:
         best_profit = 0
         optimal_entry_threshold = 0
         optimal_exit_threshold = 0
+
+        # test statistic must be negative and we need daily data
+        results = adfuller(ticker_ts_df["Adj Close"], maxlag=1, regression='c', autolag=None)
+        print(results)
+
+        #Hurst Value to do
 
         # Try different combinations of entry_threshold and exit_threshold
         for entry_threshold in entry_threshold_range:
